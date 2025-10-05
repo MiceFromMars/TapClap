@@ -39,7 +39,8 @@ export class DefaultAnimationController implements IAnimationController {
       
       tileView.setVisualPosition(startWorldPos);
       
-      return tileView.playDropAnimation(targetWorldPos, this._config.refillDelay);
+      const delay = targetPosition.row * this._config.refillDelay;
+      return tileView.playDropAnimation(targetWorldPos, delay);
     });
     await Promise.all(animations);
   }
@@ -75,7 +76,7 @@ export default class BoardView extends cc.Component implements IBoardView {
     this._animationController = new DefaultAnimationController({
       burnDuration: 0.18,
       dropDuration: 0.28,
-      refillDelay: 0.05
+      refillDelay: this._config.refillDelay
     }, this._config.cellSize);
   }
 
@@ -233,7 +234,7 @@ export default class BoardView extends cc.Component implements IBoardView {
     const targetPositions: IPosition[] = [];
 
     for (let column = 0; column < this._config.columns; column++) {
-      for (let row = 0; row < this._config.rows; row++) {
+      for (let row = this._config.rows - 1; row >= 0; row--) {
         if (!this._tiles[row][column] && newSnapshot[row][column]) {
           const tileView = this._createTileView({ row, column });
           if (tileView) {
@@ -241,7 +242,7 @@ export default class BoardView extends cc.Component implements IBoardView {
             this._tiles[row][column] = tileView;
             
             tileViews.push(tileView);
-            startPositions.push({ row: -1, column });
+            startPositions.push({ row: -1 - (this._config.rows - 1 - row), column });
             targetPositions.push({ row, column });
           } else {
             console.error(`Failed to create tile view for refill at position ${row}, ${column}`);

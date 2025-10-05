@@ -9,6 +9,7 @@ export interface IBoardConfig {
   readonly columns: number;
   readonly cellSize: number;
   readonly colorCount: number;
+  readonly refillDelay: number;
 }
 
 export interface IScoringConfig {

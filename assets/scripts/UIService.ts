@@ -16,13 +16,13 @@ export class UIService implements IUIService {
 
   updateScore(score: number): void {
     if (this._scoreLabel) {
-      this._scoreLabel.string = `Score: ${score}`;
+      this._scoreLabel.string = `${score} ИЗ 500`;
     }
   }
 
   updateMoves(movesLeft: number): void {
     if (this._movesLabel) {
-      this._movesLabel.string = `Moves: ${movesLeft}`;
+      this._movesLabel.string = `${movesLeft}`;
     }
   }
 
@@ -60,11 +60,11 @@ export class UIService implements IUIService {
     });
 
     this._eventBus.subscribe(GameEvents.GAME_WON, () => {
-      this.showGameOverMessage("You Win!");
+      this.showGameOverMessage("ПОБЕДА!");
     });
 
     this._eventBus.subscribe(GameEvents.GAME_LOST, () => {
-      this.showGameOverMessage("Game Over");
+      this.showGameOverMessage("ПРОИГРЫШ");
     });
 
     this._eventBus.subscribe(GameEvents.GAME_RESTARTED, () => {

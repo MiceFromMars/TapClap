@@ -67,7 +67,8 @@ export default class GameController extends cc.Component {
       rows: this.rows,
       columns: this.cols,
       cellSize: this.cellSize,
-      colorCount: this.colorCount
+      colorCount: this.colorCount,
+      refillDelay: this.refillDelay
     };
 
     const scoringConfig: IScoringConfig = {
