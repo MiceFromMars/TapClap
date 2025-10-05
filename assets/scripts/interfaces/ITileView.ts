@@ -1,4 +1,5 @@
-import { ITile, IPosition } from "../types";
+import { ITile } from "./ITile";
+import { IPosition } from "./IPosition";
 import { IEventBus } from "./IEventBus";
 
 export interface ITileView {
@@ -8,6 +9,7 @@ export interface ITileView {
   playDropAnimation(targetPosition: cc.Vec2, delay?: number): Promise<void>;
   getPosition(): IPosition;
   setPosition(position: IPosition): void;
+  setVisualPosition(position: cc.Vec2): void;
   isActive(): boolean;
   setActive(active: boolean): void;
   gridR: number;

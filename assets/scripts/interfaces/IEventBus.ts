@@ -1,4 +1,4 @@
-import { IGameEvent } from "../types";
+import { IGameEvent } from "./IGameEvent";
 
 export interface IEventBus {
   subscribe<T>(eventType: string, callback: (event: IGameEvent & { data: T }) => void): void;
@@ -6,4 +6,6 @@ export interface IEventBus {
   publish<T>(eventType: string, data: T): void;
   clear(): void;
 }
+
+
 

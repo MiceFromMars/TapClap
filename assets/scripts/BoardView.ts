@@ -1,5 +1,8 @@
 const { ccclass, property } = cc._decorator;
-import { ITile, IPosition, IBoardConfig, IAnimationConfig, Pos } from "./types";
+import { ITile } from "./interfaces/ITile";
+import { IPosition } from "./interfaces/IPosition";
+import { IBoardConfig } from "./interfaces/IGameConfig";
+import { IAnimationConfig } from "./interfaces/IAnimationConfig";
 import { ITileView } from "./interfaces/ITileView";
 import { IEventBus } from "./interfaces/IEventBus";
 import { GameEvents, IBoardAnimationEvent } from "./GameEvents";
@@ -8,7 +11,10 @@ import { IAnimationController } from "./interfaces/IAnimationController";
 import TileView from "./TileView";
 
 export class DefaultAnimationController implements IAnimationController {
-  constructor(private readonly _config: IAnimationConfig) {}
+  constructor(
+    private readonly _config: IAnimationConfig,
+    private readonly _cellSize: number
+  ) {}
 
   async playBurnAnimation(tileViews: ITileView[]): Promise<void> {
     const animations = tileViews.map(tileView => tileView.playBurnAnimation());
@@ -31,8 +37,7 @@ export class DefaultAnimationController implements IAnimationController {
       const startWorldPos = this._getWorldPosition(startPosition);
       const targetWorldPos = this._getWorldPosition(targetPosition);
       
-      // Set initial position
-      tileView.setPosition(startPosition);
+      tileView.setVisualPosition(startWorldPos);
       
       return tileView.playDropAnimation(targetWorldPos, this._config.refillDelay);
     });
@@ -40,8 +45,8 @@ export class DefaultAnimationController implements IAnimationController {
   }
 
   private _getWorldPosition(position: IPosition): cc.Vec2 {
-    const x = position.column * 72; // Default cell size
-    const y = -position.row * 72;
+    const x = position.column * this._cellSize;
+    const y = -position.row * this._cellSize;
     return cc.v2(x, y);
   }
 }
@@ -50,8 +55,6 @@ export class DefaultAnimationController implements IAnimationController {
 export default class BoardView extends cc.Component implements IBoardView {
   @property(cc.Prefab) tilePrefab: cc.Prefab = null;
   @property(cc.Node) gridParent: cc.Node = null;
-  @property(cc.Float) cellSize: number = 72;
-  @property(cc.Float) refillDelay: number = 0.05;
 
   private _tiles: (ITileView | null)[][] = [];
   private _config: IBoardConfig;
@@ -72,8 +75,8 @@ export default class BoardView extends cc.Component implements IBoardView {
     this._animationController = new DefaultAnimationController({
       burnDuration: 0.18,
       dropDuration: 0.28,
-      refillDelay: this.refillDelay
-    });
+      refillDelay: 0.05
+    }, this._config.cellSize);
   }
 
   setConfig(config: IBoardConfig): void {
@@ -86,77 +89,13 @@ export default class BoardView extends cc.Component implements IBoardView {
   }
 
   async animateBurnAndCollapse(positions: IPosition[], newSnapshot: (ITile | null)[][]): Promise<void> {
-    // Convert IPosition[] to Pos[] for internal processing
-    const group: Pos[] = positions.map(p => ({ r: p.row, c: p.column }));
-    
-    this._eventBus.publish(GameEvents.BOARD_ANIMATION_STARTED, {
-      animationType: "burn",
-      positions
-    });
-
-    // 1) burn
-    const burns: Promise<void>[] = [];
-    for (const p of group) {
-      const tv = this._tiles[p.r][p.c];
-      if (tv) {
-        burns.push(tv.playBurnAnimation());
-        this._tiles[p.r][p.c] = null;
-      }
-    }
-    await Promise.all(burns);
-
-    // 2) collapse
-    const drops: Promise<void>[] = [];
-    for (let c = 0; c < this._config.columns; c++) {
-      let write = this._config.rows - 1;
-      for (let r = this._config.rows - 1; r >= 0; r--) {
-        const tv = this._tiles[r][c];
-        if (tv) {
-          if (write !== r) {
-            this._tiles[write][c] = tv;
-            this._tiles[r][c] = null;
-            const targetPos = this.getWorldPosition(write, c);
-            drops.push(tv.playDropAnimation(targetPos));
-            tv.gridR = write; tv.gridC = c;
-          }
-          write--;
-        }
-      }
-    }
-    await Promise.all(drops);
-
-    // 3) refill from top (instantiate prefabs falling down)
-    const refills: Promise<void>[] = [];
-    for (let c = 0; c < this._config.columns; c++) {
-      for (let r = this._config.rows - 1; r >= 0; r--) {
-        if (!this._tiles[r][c]) {
-          const node = cc.instantiate(this.tilePrefab);
-          node.parent = this.gridParent;
-          const startPos = this.getWorldPosition(-1, c);
-          node.setPosition(startPos);
-          const tv = node.getComponent(TileView) as ITileView;
-          
-          // Initialize the tile view with event bus
-          if (this._eventBus) {
-            tv.initialize(this._eventBus);
-          }
-          
-          tv.gridR = r; tv.gridC = c;
-          this._tiles[r][c] = tv;
-          
-          // Set tile data immediately with proper color
-          tv.setData(newSnapshot[r][c]);
-          
-          const targetPos = this.getWorldPosition(r, c);
-          refills.push(tv.playDropAnimation(targetPos, 0.05 * (this._config.rows - r)));
-        }
-      }
-    }
-    await Promise.all(refills);
-
-    this._eventBus.publish(GameEvents.BOARD_ANIMATION_COMPLETED, {
-      animationType: "refill"
-    });
+    const tileViews = this._getTileViewsAtPositions(positions);
+    await this._animationController.playBurnAnimation(tileViews);
+    this._clearTilesAtPositions(positions);
+    const { tileViews: dropTileViews, targetPositions } = this._calculateDropPositions();
+    await this._animationController.playDropAnimation(dropTileViews, targetPositions);
+    const { tileViews: refillTileViews, startPositions, targetPositions: refillTargetPositions } = this._calculateRefillPositions(newSnapshot);
+    await this._animationController.playRefillAnimation(refillTileViews, startPositions, refillTargetPositions);
   }
 
   applySnapshot(snapshot: (ITile | null)[][]): void {
@@ -176,19 +115,9 @@ export default class BoardView extends cc.Component implements IBoardView {
   }
 
   private _setupEventListeners(): void {
-    if (this._eventBus) {
-      this._eventBus.subscribe(GameEvents.TILE_CLICKED, this._onTileClicked.bind(this));
-    }
   }
 
   private _removeEventListeners(): void {
-    if (this._eventBus) {
-      this._eventBus.unsubscribe(GameEvents.TILE_CLICKED, this._onTileClicked.bind(this));
-    }
-  }
-
-  private _onTileClicked(event: any): void {
-    this.node.emit("TileClicked", event.data);
   }
 
   private _clearGrid(): void {
@@ -241,14 +170,8 @@ export default class BoardView extends cc.Component implements IBoardView {
   }
 
   private _getWorldPosition(position: IPosition): cc.Vec2 {
-    const x = position.column * this.cellSize;
-    const y = -position.row * this.cellSize;
-    return cc.v2(x, y);
-  }
-
-  private getWorldPosition(r: number, c: number): cc.Vec2 {
-    const x = c * this.cellSize;
-    const y = -r * this.cellSize;
+    const x = position.column * this._config.cellSize;
+    const y = -position.row * this._config.cellSize;
     return cc.v2(x, y);
   }
 
@@ -310,9 +233,9 @@ export default class BoardView extends cc.Component implements IBoardView {
     const targetPositions: IPosition[] = [];
 
     for (let column = 0; column < this._config.columns; column++) {
-      for (let row = this._config.rows - 1; row >= 0; row--) {
+      for (let row = 0; row < this._config.rows; row++) {
         if (!this._tiles[row][column] && newSnapshot[row][column]) {
-          const tileView = this._createTileView({ row: -1, column });
+          const tileView = this._createTileView({ row, column });
           if (tileView) {
             tileView.setData(newSnapshot[row][column]);
             this._tiles[row][column] = tileView;
@@ -330,11 +253,4 @@ export default class BoardView extends cc.Component implements IBoardView {
     return { tileViews, startPositions, targetPositions };
   }
 
-  // Legacy methods for backward compatibility
-  initFromSnapshot(snapshot: (any | null)[][]): void {
-    this.initializeFromSnapshot(snapshot as (ITile | null)[][]);
-  }
-
-  get rows(): number { return this._config?.rows || 8; }
-  get cols(): number { return this._config?.columns || 8; }
 }

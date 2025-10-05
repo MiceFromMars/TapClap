@@ -40,17 +40,3 @@ export function getInputManager(): IInputManager {
   return _inputManager;
 }
 
-// Legacy static class for backward compatibility
-export default class InputLock {
-  static lock(): void {
-    getInputManager().lock();
-  }
-
-  static unlock(): void {
-    getInputManager().unlock();
-  }
-
-  static get isLocked(): boolean {
-    return getInputManager().isLocked();
-  }
-}

@@ -1,4 +1,6 @@
-import { ITile, IPosition, IBoardConfig, Tile, Pos } from "./types";
+import { ITile } from "./interfaces/ITile";
+import { IPosition, Pos } from "./interfaces/IPosition";
+import { IBoardConfig } from "./interfaces/IGameConfig";
 import { ITileFactory } from "./interfaces/ITileFactory";
 import { IEventBus } from "./interfaces/IEventBus";
 import { GameEvents, ITilesMatchedEvent } from "./GameEvents";
@@ -6,7 +8,7 @@ import { IGameBoard } from "./interfaces/IGameBoard";
 
 
 export class GameBoard implements IGameBoard {
-  private grid: (Tile | null)[][];
+  private grid: (ITile | null)[][];
 
   constructor(
     private readonly _config: IBoardConfig,
@@ -32,7 +34,7 @@ export class GameBoard implements IGameBoard {
     return this.grid[position.row][position.column];
   }
 
-  tileAt(p: Pos): Tile | null { 
+  tileAt(p: Pos): ITile | null { 
     return this.grid[p.r][p.c]; 
   }
 
@@ -70,28 +72,20 @@ export class GameBoard implements IGameBoard {
   removeTiles(positions: IPosition[]): void {
     if (positions.length === 0) return;
 
-    // Convert IPosition to Pos and remove tiles
     for (const position of positions) {
       if (this._isValidPosition(position)) {
         this.grid[position.row][position.column] = null;
       }
     }
 
-    // Apply gravity and refill
     this.applyGravity();
     this.refillTop();
 
-    // Publish event
     this._eventBus.publish(GameEvents.BOARD_UPDATED, {
       removedPositions: positions
     });
   }
 
-  removePositions(positions: Pos[]) {
-    for (const p of positions) this.grid[p.r][p.c] = null;
-    this.applyGravity();
-    this.refillTop();
-  }
 
   hasValidMoves(): boolean {
     const seen = new Set<string>();
@@ -107,9 +101,6 @@ export class GameBoard implements IGameBoard {
     return false;
   }
 
-  anyMovesExist(): boolean {
-    return this.hasValidMoves();
-  }
 
   getSnapshot(): (ITile | null)[][] {
     return this.grid.map(row => 
@@ -117,9 +108,6 @@ export class GameBoard implements IGameBoard {
     );
   }
 
-  snapshot(): (Tile | null)[][] {
-    return this.grid.map(row => row.map(cell => cell ? { ...cell } : null));
-  }
 
   initialize(): void {
     this.fillAll();
@@ -155,7 +143,4 @@ export class GameBoard implements IGameBoard {
       for (let r = 0; r < this._config.rows; r++)
         if (!this.grid[r][c]) this.grid[r][c] = this._tileFactory.next();
   }
-
-  // Legacy methods for backward compatibility
-  getCols(): number { return this.getColumns(); }
 }

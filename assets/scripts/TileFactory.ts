@@ -1,4 +1,5 @@
-import { ITile, IBoardConfig } from "./types";
+import { ITile } from "./interfaces/ITile";
+import { IBoardConfig } from "./interfaces/IGameConfig";
 import { ITileFactory, ITileGenerator } from "./interfaces/ITileFactory";
 
 export class RandomTileGenerator implements ITileGenerator {

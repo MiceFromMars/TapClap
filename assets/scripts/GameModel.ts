@@ -1,11 +1,14 @@
-import { IGameState, IGameConfig, IPosition, ITile } from "./types";
+import { IGameModel } from "./interfaces/IGameModel";
+import { IGameState } from "./interfaces/IGameState";
+import { IGameConfig } from "./interfaces/IGameConfig";
+import { IPosition } from "./interfaces/IPosition";
+import { ITile } from "./interfaces/ITile";
 import { IGameBoard } from "./interfaces/IGameBoard";
 import { IScoringStrategy } from "./interfaces/IScoringStrategy";
 import { IEventBus } from "./interfaces/IEventBus";
-import { GameEvents, ITilesMatchedEvent, IGameStateChangedEvent } from "./GameEvents";
-import { IGameService } from "./interfaces/IGameService";
+import { GameEvents, ITilesMatchedEvent } from "./GameEvents";
 
-export class GameService implements IGameService {
+export class GameModel implements IGameModel {
   private _score = 0;
   private _movesLeft = 0;
   private _isGameOver = false;
@@ -30,6 +33,10 @@ export class GameService implements IGameService {
     };
   }
 
+  getBoardSnapshot(): (ITile | null)[][] {
+    return this._board.getSnapshot();
+  }
+
   async processTileClick(position: IPosition): Promise<boolean> {
     if (this._isGameOver || this._movesLeft <= 0) {
       return false;
@@ -40,23 +47,37 @@ export class GameService implements IGameService {
       return false;
     }
 
-    // Calculate score
     const score = this._scoringStrategy.getTotalScore(matchingGroup.length);
     this._score += score;
     this._movesLeft--;
-
-    // Remove tiles from board
-    this._board.removeTiles(matchingGroup);
-
-    // Publish events
     this._eventBus.publish(GameEvents.TILES_MATCHED, {
       positions: matchingGroup,
       score
     } as ITilesMatchedEvent);
 
     this._updateGameState();
+    this._checkGameConditions();
 
     return true;
+  }
+
+  async processTileMatch(matchingGroup: IPosition[]): Promise<void> {
+    if (this._isGameOver || this._movesLeft <= 0) {
+      return;
+    }
+
+    const score = this._scoringStrategy.getTotalScore(matchingGroup.length);
+    this._score += score;
+    this._movesLeft--;
+
+    this._board.removeTiles(matchingGroup);
+    this._eventBus.publish(GameEvents.TILES_MATCHED, {
+      positions: matchingGroup,
+      score
+    } as ITilesMatchedEvent);
+
+    this._updateGameState();
+    this._checkGameConditions();
   }
 
   restart(): void {
@@ -74,6 +95,14 @@ export class GameService implements IGameService {
 
   isWon(): boolean {
     return this._isWon;
+  }
+
+  hasValidMoves(): boolean {
+    return this._board.hasValidMoves();
+  }
+
+  findMatchingGroup(position: IPosition): IPosition[] {
+    return this._board.findMatchingGroup(position);
   }
 
   private _setupEventListeners(): void {
@@ -100,6 +129,6 @@ export class GameService implements IGameService {
     this._eventBus.publish(GameEvents.MOVES_UPDATED, { movesLeft: this._movesLeft });
     
     const state = this.getCurrentState();
-    this._eventBus.publish(GameEvents.UI_UPDATED, { state } as IGameStateChangedEvent);
+    this._eventBus.publish(GameEvents.UI_UPDATED, { state });
   }
 }

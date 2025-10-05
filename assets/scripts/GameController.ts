@@ -1,18 +1,21 @@
 const { ccclass, property } = cc._decorator;
-import { IGameConfig, IBoardConfig, IScoringConfig, IUIConfig, IPosition } from "./types";
+import { IGameConfig, IBoardConfig, IScoringConfig, IUIConfig } from "./interfaces/IGameConfig";
+import { IPosition } from "./interfaces/IPosition";
 import { IEventBus } from "./interfaces/IEventBus";
 import { gameEventBus } from "./EventBus";
 import { initializeInputManager, getInputManager } from "./InputLock";
 import { IBoardView } from "./interfaces/IBoardView";
 import { IGameBoard } from "./interfaces/IGameBoard";
 import { GameBoard } from "./GameBoard";
-import { IGameService } from "./interfaces/IGameService";
-import { GameService } from "./GameService";
+import { IGameModel } from "./interfaces/IGameModel";
+import { GameModel } from "./GameModel";
+import { IBoardPresenter } from "./interfaces/IBoardPresenter";
+import { BoardPresenter } from "./BoardPresenter";
 import { IUIService } from "./interfaces/IUIService";
 import { UIService } from "./UIService";
 import { TileFactoryFactory } from "./TileFactory";
 import { ScoringStrategyFactory } from "./ScoringStrategy";
-import { GameEvents, ITileClickedEvent } from "./GameEvents";
+import { GameEvents } from "./GameEvents";
 
 @ccclass
 export default class GameController extends cc.Component {
@@ -27,11 +30,15 @@ export default class GameController extends cc.Component {
   @property(cc.Integer) moves: number = 20;
   @property(cc.Integer) targetScore: number = 500;
   @property(cc.Integer) colorCount: number = 5;
+  @property(cc.Float) cellSize: number = 72;
+  @property(cc.Float) animationDuration: number = 0.3;
+  @property(cc.Float) refillDelay: number = 0.05;
 
   private _eventBus: IEventBus;
   private _gameConfig: IGameConfig;
   private _board: IGameBoard;
-  private _gameService: IGameService;
+  private _gameModel: IGameModel;
+  private _boardPresenter: IBoardPresenter;
   private _uiService: IUIService;
 
   onLoad() {
@@ -45,25 +52,13 @@ export default class GameController extends cc.Component {
   }
 
   private _initializeServices(): void {
-    // Initialize event bus
     this._eventBus = gameEventBus;
-
-    // Initialize input manager
     initializeInputManager(this._eventBus);
-
-    // Create game configuration
     this._gameConfig = this._createGameConfig();
-
-    // Initialize board
     this._board = this._createGameBoard();
-
-    // Initialize game service
-    this._gameService = this._createGameService();
-
-    // Initialize UI service
+    this._gameModel = this._createGameModel();
+    this._boardPresenter = this._createBoardPresenter();
     this._uiService = this._createUIService();
-
-    // Initialize board view
     this._initializeBoardView();
   }
 
@@ -71,7 +66,7 @@ export default class GameController extends cc.Component {
     const boardConfig: IBoardConfig = {
       rows: this.rows,
       columns: this.cols,
-      cellSize: 72,
+      cellSize: this.cellSize,
       colorCount: this.colorCount
     };
 
@@ -83,7 +78,7 @@ export default class GameController extends cc.Component {
 
     const uiConfig: IUIConfig = {
       moves: this.moves,
-      animationDuration: 0.3
+      animationDuration: this.animationDuration
     };
 
     return {
@@ -98,9 +93,13 @@ export default class GameController extends cc.Component {
     return new GameBoard(this._gameConfig.board, tileFactory, this._eventBus);
   }
 
-  private _createGameService(): IGameService {
+  private _createGameModel(): IGameModel {
     const scoringStrategy = ScoringStrategyFactory.createDefault(this._gameConfig.scoring);
-    return new GameService(this._board, scoringStrategy, this._eventBus, this._gameConfig);
+    return new GameModel(this._board, scoringStrategy, this._eventBus, this._gameConfig);
+  }
+
+  private _createBoardPresenter(): IBoardPresenter {
+    return new BoardPresenter();
   }
 
   private _createUIService(): IUIService {
@@ -116,17 +115,16 @@ export default class GameController extends cc.Component {
   private _initializeBoardView(): void {
     if (this.boardView) {
       (this.boardView as any).initialize(this._eventBus, this._gameConfig.board);
+      this._boardPresenter.initialize(this.boardView, this._board, this._eventBus, this._gameConfig.board, this._gameModel);
     }
   }
 
   private _setupEventListeners(): void {
-    this._eventBus.subscribe(GameEvents.TILE_CLICKED, this._onTileClicked.bind(this));
     this._eventBus.subscribe(GameEvents.BOARD_ANIMATION_STARTED, this._onAnimationStarted.bind(this));
     this._eventBus.subscribe(GameEvents.BOARD_ANIMATION_COMPLETED, this._onAnimationCompleted.bind(this));
   }
 
   private _cleanupEventListeners(): void {
-    this._eventBus.unsubscribe(GameEvents.TILE_CLICKED, this._onTileClicked.bind(this));
     this._eventBus.unsubscribe(GameEvents.BOARD_ANIMATION_STARTED, this._onAnimationStarted.bind(this));
     this._eventBus.unsubscribe(GameEvents.BOARD_ANIMATION_COMPLETED, this._onAnimationCompleted.bind(this));
   }
@@ -135,7 +133,7 @@ export default class GameController extends cc.Component {
     this._board.initialize();
     
     if (this.boardView) {
-      this.boardView.initializeFromSnapshot(this._board.getSnapshot());
+      this.boardView.initializeFromSnapshot(this._gameModel.getBoardSnapshot());
     } else {
       console.error("BoardView is not assigned!");
     }
@@ -143,27 +141,6 @@ export default class GameController extends cc.Component {
     this._eventBus.publish(GameEvents.GAME_STARTED, {});
   }
 
-  private async _onTileClicked(event: any): Promise<void> {
-    const inputManager = getInputManager();
-    if (inputManager.isLocked()) return;
-
-    inputManager.lock();
-
-    try {
-      const tileClickedEvent = event.data as ITileClickedEvent;
-      
-      // Get matching group BEFORE processing the click
-      const matchingGroup = this._board.findMatchingGroup(tileClickedEvent.position);
-      
-      const success = await this._gameService.processTileClick(tileClickedEvent.position);
-      
-      if (success && this.boardView) {
-        await this.boardView.animateBurnAndCollapse(matchingGroup, this._board.getSnapshot());
-      }
-    } finally {
-      inputManager.unlock();
-    }
-  }
 
   private _onAnimationStarted(): void {
     getInputManager().lock();
@@ -174,9 +151,9 @@ export default class GameController extends cc.Component {
   }
 
   public onRestartButton(): void {
-    this._gameService.restart();
+    this._gameModel.restart();
     if (this.boardView) {
-      this.boardView.initializeFromSnapshot(this._board.getSnapshot());
+      this.boardView.initializeFromSnapshot(this._gameModel.getBoardSnapshot());
     }
   }
 

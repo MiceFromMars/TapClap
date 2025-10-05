@@ -1,4 +1,5 @@
-import { ITile, IBoardConfig } from "../types";
+import { ITile } from "./ITile";
+import { IBoardConfig } from "./IGameConfig";
 
 export interface ITileFactory {
   next(): ITile;

@@ -1,4 +1,4 @@
-import { IGameState } from "../types";
+import { IGameState } from "./IGameState";
 
 export interface IUIService {
   updateScore(score: number): void;
@@ -7,4 +7,6 @@ export interface IUIService {
   showGameOverMessage(message: string): void;
   hideGameOverMessage(): void;
 }
+
+
 

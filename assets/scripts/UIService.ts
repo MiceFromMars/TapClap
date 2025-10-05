@@ -1,4 +1,4 @@
-import { IGameState } from "./types";
+import { IGameState } from "./interfaces/IGameState";
 import { IEventBus } from "./interfaces/IEventBus";
 import { GameEvents, IGameStateChangedEvent } from "./GameEvents";
 import { IUIService } from "./interfaces/IUIService";

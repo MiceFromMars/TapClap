@@ -1,4 +1,5 @@
-import { ITile, IPosition } from "../types";
+import { ITile } from "./ITile";
+import { IPosition } from "./IPosition";
 
 export interface IGameBoard {
   getRows(): number;
@@ -10,4 +11,6 @@ export interface IGameBoard {
   getSnapshot(): (ITile | null)[][];
   initialize(): void;
 }
+
+
 

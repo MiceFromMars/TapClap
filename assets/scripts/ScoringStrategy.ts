@@ -1,4 +1,4 @@
-import { IScoringConfig } from "./types";
+import { IScoringConfig } from "./interfaces/IGameConfig";
 import { IScoringStrategy } from "./interfaces/IScoringStrategy";
 
 export class DefaultScoringStrategy implements IScoringStrategy {

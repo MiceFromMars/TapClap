@@ -1,5 +1,5 @@
 import { IEventBus } from "./interfaces/IEventBus";
-import { IGameEvent } from "./types";
+import { IGameEvent } from "./interfaces/IGameEvent";
 
 export class EventBus implements IEventBus {
   private readonly _listeners = new Map<string, Set<Function>>();

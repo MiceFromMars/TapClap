@@ -1,5 +1,7 @@
 const { ccclass, property } = cc._decorator;
-import { ITile, IPosition, IAnimationConfig } from "./types";
+import { ITile } from "./interfaces/ITile";
+import { IPosition } from "./interfaces/IPosition";
+import { IAnimationConfig } from "./interfaces/IAnimationConfig";
 import { GameEvents, ITileClickedEvent } from "./GameEvents";
 import { IEventBus } from "./interfaces/IEventBus";
 import { ITileView } from "./interfaces/ITileView";
@@ -60,7 +62,6 @@ export default class TileView extends cc.Component implements ITileView {
         this.label.string = "";
       }
     } else {
-      // Fallback: show index letter
       if (this.label) {
         this.label.string = String(tile.colorIndex);
       }
@@ -110,6 +111,10 @@ export default class TileView extends cc.Component implements ITileView {
     this.gridC = position.column;
   }
 
+  setVisualPosition(position: cc.Vec2): void {
+    this.node.setPosition(position);
+  }
+
   isActive(): boolean {
     return this.node.active;
   }
@@ -124,6 +129,4 @@ export default class TileView extends cc.Component implements ITileView {
     this.node.opacity = 255;
   }
 
-  // Getters for backward compatibility
-  get tileData(): ITile | null { return this._tileData; }
 }

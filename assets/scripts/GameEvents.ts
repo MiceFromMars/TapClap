@@ -1,4 +1,5 @@
-import { IPosition, IGameState } from "./types";
+import { IPosition } from "./interfaces/IPosition";
+import { IGameState } from "./interfaces/IGameState";
 
 export class GameEvents {
   // Game State Events
@@ -42,4 +43,5 @@ export interface IBoardAnimationEvent {
   animationType: "burn" | "drop" | "refill";
   positions?: IPosition[];
 }
+
 

@@ -1,4 +1,5 @@
-import { IGameState, IPosition } from "../types";
+import { IGameState } from "./IGameState";
+import { IPosition } from "./IPosition";
 
 export interface IGameService {
   getCurrentState(): IGameState;
