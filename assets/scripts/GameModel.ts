@@ -24,6 +24,10 @@ export class GameModel implements IGameModel {
     this._setupEventListeners();
   }
 
+  onDestroy(): void {
+    this._cleanupEventListeners();
+  }
+
   getCurrentState(): IGameState {
     return {
       score: this._score,
@@ -87,6 +91,7 @@ export class GameModel implements IGameModel {
     this._isWon = false;
     this._board.initialize();
     this._eventBus.publish(GameEvents.GAME_RESTARTED, {});
+    this._updateGameState();
   }
 
   isGameOver(): boolean {
@@ -107,6 +112,12 @@ export class GameModel implements IGameModel {
 
   private _setupEventListeners(): void {
     this._eventBus.subscribe(GameEvents.BOARD_UPDATED, this._onBoardUpdated.bind(this));
+    this._eventBus.subscribe(GameEvents.GAME_STARTED, this._updateGameState.bind(this));
+  }
+
+  private _cleanupEventListeners(): void {
+    this._eventBus.unsubscribe(GameEvents.BOARD_UPDATED, this._onBoardUpdated.bind(this));
+    this._eventBus.unsubscribe(GameEvents.GAME_STARTED, this._updateGameState.bind(this));
   }
 
   private _onBoardUpdated(): void {
